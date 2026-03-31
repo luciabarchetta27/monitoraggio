@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitoraggio Strutturale — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#060a10;--bg2:#0c1219;--card:#0f1620;--border:#1a2535;--borderH:#2563eb;
+  --accent:#2563eb;--accentG:rgba(37,99,235,0.12);--accentG2:rgba(37,99,235,0.25);
+  --tiltX:#f59e0b;--tiltY:#06b6d4;--fess:#a78bfa;--fess2:#f472b6;--fess3:#34d399;
+  --temp:#ef4444;--green:#10b981;--pink:#ec4899;--warn:#f59e0b;--danger:#ef4444;
+  --text:#e8ecf2;--text2:#8b97a8;--dim:#4a5568;--grid:#151e2d;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.mono{font-family:'IBM Plex Mono',monospace}
+.hidden{display:none!important}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* Login */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;position:relative;overflow:hidden}
+.login-grid{position:absolute;inset:0;opacity:0.03;background-image:linear-gradient(var(--accent) 1px,transparent 1px),linear-gradient(90deg,var(--accent) 1px,transparent 1px);background-size:40px 40px}
+.login-box{width:420px;padding:48px 40px;background:var(--card);border:1px solid var(--border);border-radius:20px;position:relative;box-shadow:0 0 80px var(--accentG);z-index:1}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.logo-icon{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--tiltY));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0}
+.login-row{display:flex;gap:8px}
+.code-input{flex:1;padding:12px 16px;border-radius:10px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:15px;outline:none;letter-spacing:0.15em;text-align:center;text-transform:uppercase}
+.code-input:focus{border-color:var(--accent)}
+.login-error{margin-top:12px;color:var(--danger);font-size:12px;text-align:center}
+
+/* Buttons */
+.btn{padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Outfit';font-size:12px;font-weight:500;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--text)}
+.btn-accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-accent:hover{filter:brightness(1.15)}
+.btn-green{background:rgba(16,185,129,0.08);color:var(--green);border-color:rgba(16,185,129,0.25)}
+.btn-sm{padding:5px 12px;font-size:11px}
+
+/* Header */
+header{border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.hdr-left{display:flex;align-items:center;gap:10px}
+.hdr-left h1{font-size:15px;font-weight:700}
+.hdr-left p{font-size:10px;color:var(--dim)}
+.hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hdr-info{font-size:10px;color:var(--text2)}
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;font-size:10px;font-weight:700;padding:0 5px}
+.badge-danger{background:rgba(239,68,68,0.15);color:var(--danger)}
+.badge-warn{background:rgba(245,158,11,0.15);color:var(--warn)}
+
+/* Upload area */
+#uploadArea{padding:20px}
+.upload-section{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px}
+.upload-section h3{font-size:14px;font-weight:600;margin-bottom:4px}
+.upload-section .sub{font-size:11px;color:var(--dim);margin-bottom:16px}
+.drop-zone{border:2px dashed var(--border);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all 0.3s}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:var(--accentG)}
+.drop-zone h4{font-size:15px;margin:8px 0 4px}
+.drop-zone p{font-size:12px;color:var(--text2)}
+.file-list{margin-top:12px}
+.file-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg2);border-radius:8px;margin-bottom:6px;font-size:12px}
+.file-item .name{font-family:'IBM Plex Mono',monospace;color:var(--accent)}
+.file-item .info{color:var(--text2);font-size:11px}
+.file-item .remove{background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0 4px}
+
+/* Node selector */
+.node-selector{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.node-chip{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;transition:all 0.2s;font-family:'Outfit'}
+.node-chip:hover{border-color:var(--accent)}
+.node-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* Tabs */
+.tabs{display:flex;gap:3px;padding:12px 20px 0;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{padding:7px 14px;border-radius:8px 8px 0 0;border:none;background:transparent;color:var(--text2);font-family:'Outfit';font-size:12px;font-weight:500;cursor:pointer;transition:all 0.2s;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:#fff;background:var(--accent)}
+
+/* Content */
+.content{padding:16px 20px 32px}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;position:relative;overflow:hidden}
+.stat-bar{position:absolute;top:0;left:0;right:0;height:2px}
+.stat-label{font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:var(--dim);margin-bottom:5px}
+.stat-val{font-size:19px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+.stat-unit{font-size:10px;color:var(--text2);margin-left:3px}
+.stat-sub{font-size:9px;color:var(--dim);margin-top:3px}
+
+/* Charts */
+.charts{display:grid;gap:12px}
+.charts-2{grid-template-columns:1fr 1fr}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;transition:border-color 0.25s}
+.chart-card:hover{border-color:var(--borderH)}
+.chart-card h3{font-size:13px;font-weight:600;margin-bottom:2px}
+.chart-card .sub{font-size:10px;color:var(--dim);margin-bottom:12px}
+.chart-card canvas{width:100%!important}
+.chart-full{grid-column:1/-1}
+
+/* Date filter */
+.date-filter{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.date-filter label{font-size:11px;color:var(--text2)}
+.date-input{padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none}
+.date-input:focus{border-color:var(--accent)}
+.quick-btns{display:flex;gap:4px}
+
+/* Alert */
+.alert{padding:10px 16px;border-radius:10px;display:flex;align-items:center;gap:10px;font-size:12px;margin-bottom:14px}
+.alert-danger{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);color:var(--danger)}
+.alert-ok{background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.25);color:var(--green)}
+
+/* Summary */
+.summary-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;line-height:1.8;font-size:13px;color:var(--text2)}
+.summary-box strong{color:var(--text)}
+.summary-box .ok{color:var(--green)}
+.summary-box .wrn{color:var(--warn)}
+.summary-box .dng{color:var(--danger)}
+
+/* Settings */
+.settings-panel{border-bottom:1px solid var(--border);padding:16px 20px;background:var(--bg2)}
+.settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}
+.setting-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px}
+.setting-item label{font-size:11px;color:var(--text2);display:block;margin-bottom:4px}
+.setting-item input[type=number]{width:80px;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none}
+.setting-item input:focus{border-color:var(--accent)}
+.setting-row{display:flex;gap:12px;align-items:end}
+
+/* Table */
+.alarm-table{width:100%;border-collapse:collapse;font-size:11px}
+.alarm-table th{text-align:left;padding:7px 8px;color:var(--dim);font-weight:500;font-size:9px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.alarm-table td{padding:7px 8px;border-bottom:1px solid var(--border)}
+.row-dng{background:rgba(239,68,68,0.04)}
+
+/* Regression info */
+.reg-info{font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:2;color:var(--text2);padding:8px}
+
+/* Responsive */
+@media(max-width:768px){
+  .charts-2{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .login-box{width:92%;padding:32px 24px}
+  .settings-grid{grid-template-columns:1fr}
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div id="loginScreen">
+  <div class="login-grid"></div>
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-icon">M</div>
+      <div><h1 style="font-size:20px;font-weight:700">Monitoraggio</h1><p style="font-size:12px;color:var(--dim)">Dashboard strutturale</p></div>
+    </div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:24px;line-height:1.6">Inserisci il codice di accesso per visualizzare i dati di monitoraggio.</p>
+    <div class="login-row">
+      <input type="text" id="codeInput" class="code-input" placeholder="CODICE ACCESSO" autofocus>
+      <button class="btn btn-accent" style="padding:12px 24px;font-size:14px" onclick="doLogin()">→</button>
+    </div>
+    <div id="loginError" class="login-error hidden"></div>
+    <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);color:var(--dim);font-size:11px;text-align:center">Accesso riservato</div>
+  </div>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div id="mainApp" class="hidden">
+  <header>
+    <div class="hdr-left">
+      <div class="logo-icon" style="width:32px;height:32px;border-radius:8px;font-size:14px">M</div>
+      <div><h1>Monitoraggio Strutturale</h1><p id="hdrSub"></p></div>
+    </div>
+    <div class="hdr-right">
+      <span class="hdr-info" id="hdrInfo"></span>
+      <span id="hdrBadges"></span>
+      <button class="btn btn-sm" id="btnSettings" onclick="toggleSettings()" style="display:none">⚙ Soglie</button>
+      <button class="btn btn-green btn-sm" id="btnPDF" onclick="doPDF()" style="display:none">📄 PDF</button>
+      <button class="btn btn-sm" onclick="backToUpload()">↺ Nuovo</button>
+      <button class="btn btn-sm" onclick="doLogout()">Esci</button>
+    </div>
+  </header>
+
+  <!-- Settings panel -->
+  <div id="settingsPanel" class="settings-panel hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="font-size:13px;font-weight:600">Soglie di allarme</h3>
+      <button class="btn btn-sm" onclick="applyThresholds()">Applica e ricalcola</button>
+    </div>
+    <div class="settings-grid" id="thresholdSettings"></div>
+  </div>
+
+  <!-- Upload -->
+  <div id="uploadArea">
+    <div class="upload-section">
+      <h3>1. Carica i CSV dei nodi</h3>
+      <p class="sub">Puoi caricare più file — ogni file è un nodo/edificio. Il sistema riconosce automaticamente clinometri [°], fessurimetri [mm] e temperature [°C] dall'header.</p>
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <div style="font-size:36px;opacity:0.4">📐</div>
+        <h4>Trascina qui i CSV dal portale</h4>
+        <p>oppure clicca per selezionare (anche più file)</p>
+      </div>
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" multiple style="display:none">
+      <div class="file-list" id="fileList"></div>
+    </div>
+
+    <div class="upload-section" id="tempSection">
+      <h3>2. Temperatura esterna (opzionale)</h3>
+      <p class="sub">Se alcuni nodi non hanno il sensore di temperatura, puoi caricare qui un CSV con i dati di temperatura da un sensore separato.</p>
+      <div class="drop-zone" id="dropZoneTemp" onclick="document.getElementById('fileTempInput').click()" style="padding:20px">
+        <p>🌡 Trascina o clicca per caricare CSV temperatura</p>
+      </div>
+      <input type="file" id="fileTempInput" accept=".csv,.xlsx,.xls" style="display:none">
+      <div id="tempFileInfo" style="margin-top:8px"></div>
+    </div>
+
+    <div style="text-align:center;padding:12px">
+      <button class="btn btn-accent" style="padding:10px 32px;font-size:14px" id="btnProcess" onclick="processAllFiles()" disabled>Elabora dati</button>
+      <p id="processError" style="color:var(--danger);font-size:12px;margin-top:8px" class="hidden"></p>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="hidden">
+    <!-- Node selector -->
+    <div style="padding:12px 20px 0">
+      <div class="node-selector" id="nodeSelector"></div>
+    </div>
+    <div class="tabs" id="tabBar"></div>
+    <div class="content" id="contentArea"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════
+const TREF=27, DISP_FACTOR=1000;
+const ACCESS_CODES={
+  "CO7050":{project:"CO_7050_1",client:"Committente Edificio A",role:"admin"},
+  "ADMIN2026":{project:"ALL",client:"Admin",role:"admin"},
+  "URS360":{project:"URS_360_1",client:"Committente Edificio B",role:"viewer"},
+  "DEMO":{project:"DEMO",client:"Demo",role:"viewer"},
+};
+const SENSOR_COLORS=['#f59e0b','#06b6d4','#a78bfa','#f472b6','#34d399','#fb923c','#e879f9','#38bdf8'];
+let THRESHOLDS={};
+
+let currentAuth=null, allNodes={}, activeNode=null, activeTab='overview';
+let charts={}, uploadedFiles=[], tempData=null;
+
+// ═══════════════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════════════
+const codeEl=document.getElementById('codeInput');
+codeEl.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+codeEl.addEventListener('input',e=>{e.target.value=e.target.value.toUpperCase()});
+const urlCode=new URLSearchParams(window.location.search).get('code');
+if(urlCode&&ACCESS_CODES[urlCode.toUpperCase()]){codeEl.value=urlCode.toUpperCase();setTimeout(doLogin,300)}
+
+function doLogin(){
+  const c=codeEl.value.trim().toUpperCase(),m=ACCESS_CODES[c];
+  if(m){currentAuth=m;document.getElementById('loginScreen').classList.add('hidden');document.getElementById('mainApp').classList.remove('hidden');document.getElementById('hdrSub').textContent=`${m.client} — ${m.project}`}
+  else{const e=document.getElementById('loginError');e.textContent="Codice non valido";e.classList.remove('hidden');codeEl.value=''}
+}
+function doLogout(){currentAuth=null;allNodes={};activeNode=null;uploadedFiles=[];tempData=null;destroyAll();
+  document.getElementById('mainApp').classList.add('hidden');document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('dashboard').classList.add('hidden');document.getElementById('uploadArea').classList.remove('hidden');
+  document.getElementById('fileList').innerHTML='';document.getElementById('tempFileInfo').innerHTML='';
+  document.getElementById('btnProcess').disabled=true;codeEl.value='';document.getElementById('loginError').classList.add('hidden')}
+
+// ═══════════════════════════════════════════════════════════════════
+// FILE UPLOAD
+// ═══════════════════════════════════════════════════════════════════
+const dropZone=document.getElementById('dropZone'),fileInput=document.getElementById('fileInput');
+const dropZoneT=document.getElementById('dropZoneTemp'),fileTempInput=document.getElementById('fileTempInput');
+
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover')});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');addFiles(e.dataTransfer.files)});
+fileInput.addEventListener('change',e=>addFiles(e.target.files));
+
+dropZoneT.addEventListener('dragover',e=>{e.preventDefault();dropZoneT.classList.add('dragover')});
+dropZoneT.addEventListener('dragleave',()=>dropZoneT.classList.remove('dragover'));
+dropZoneT.addEventListener('drop',e=>{e.preventDefault();dropZoneT.classList.remove('dragover');loadTempFile(e.dataTransfer.files[0])});
+fileTempInput.addEventListener('change',e=>loadTempFile(e.target.files[0]));
+
+function addFiles(files){
+  for(const f of files){
+    if(uploadedFiles.find(u=>u.name===f.name))continue;
+    uploadedFiles.push(f);
+  }
+  renderFileList();
+}
+function removeFile(idx){uploadedFiles.splice(idx,1);renderFileList()}
+function renderFileList(){
+  const el=document.getElementById('fileList');
+  el.innerHTML=uploadedFiles.map((f,i)=>`<div class="file-item"><span class="name">${f.name}</span><span class="info">${(f.size/1024).toFixed(0)} KB</span><button class="remove" onclick="removeFile(${i})">×</button></div>`).join('');
+  document.getElementById('btnProcess').disabled=uploadedFiles.length===0;
+}
+
+async function loadTempFile(file){
+  if(!file)return;
+  try{
+    const rows=await parseCSV(file);
+    // Find temperature column
+    const tempCol=rows.columns.find(c=>c.type==='temperature');
+    if(!tempCol){document.getElementById('tempFileInfo').innerHTML='<span style="color:var(--danger);font-size:12px">Nessuna colonna temperatura trovata nel file</span>';return}
+    tempData={dates:rows.data.map(r=>r.date),values:rows.data.map(r=>r[tempCol.key]),name:file.name};
+    document.getElementById('tempFileInfo').innerHTML=`<div class="file-item"><span class="name">${file.name}</span><span class="info">${rows.data.length} letture · ${tempCol.label}</span><button class="remove" onclick="tempData=null;this.parentElement.remove()">×</button></div>`;
+  }catch(err){document.getElementById('tempFileInfo').innerHTML=`<span style="color:var(--danger);font-size:12px">${err.message}</span>`}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CSV PARSER — universal
+// ═══════════════════════════════════════════════════════════════════
+function parseCSV(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        let text=e.target.result;
+        
+        const lines=text.split('\n').filter(l=>l.trim());
+        if(lines.length<2)throw new Error('File vuoto');
+        
+        // Parse header
+        const sep=lines[0].includes(';')?';':',';
+        const parseRow=line=>line.split(sep).map(v=>v.replace(/^"|"$/g,'').trim());
+        const headers=parseRow(lines[0]);
+        
+        // Detect node name and sensor types from headers
+        const nodeName=headers[1]?headers[1].split(' ')[0]:'Nodo';
+        const columns=[];
+        for(let i=1;i<headers.length;i++){
+          const h=headers[i];
+          const unitMatch=h.match(/\[([^\]]+)\]/);
+          const rawUnit=unitMatch?unitMatch[1]:'';
+          const varMatch=h.match(/(VAR\d+|BATT|RSSI)/);
+          const varName=varMatch?varMatch[1]:'COL'+i;
+          
+          // Robust unit detection — handles °, \xB0, degree sign variants
+          let type='unknown';
+          const unitLower=rawUnit.toLowerCase();
+          const hLower=h.toLowerCase();
+          
+          if(unitLower==='mm')type='crackgauge';
+          else if(unitLower==='volt')type='battery';
+          else if(unitLower==='dbm')type='rssi';
+          else if(rawUnit.includes('C')&&(rawUnit.includes('\xB0')||rawUnit.includes('°')||hLower.includes('°c')||hLower.includes('temp')))type='temperature';
+          else if(rawUnit.includes('\xB0')||rawUnit.includes('°')||rawUnit==='\xB0')type='clinometer';
+          // Fallback: check if header contains clues
+          else if(hLower.includes('temp'))type='temperature';
+          else if(hLower.includes('[mm]'))type='crackgauge';
+          
+          // If unit is just a degree sign (clinometer) vs degree+C (temperature)
+          // Additional check: if rawUnit length is 1 or 2 and contains degree-like char but no 'C', it's clinometer
+          if(type==='unknown'&&rawUnit.length<=2&&rawUnit.length>0){
+            const charCode=rawUnit.charCodeAt(0);
+            if(charCode===176||charCode===0xB0||rawUnit==='°'){
+              type=rawUnit.length===1?'clinometer':(rawUnit[1]==='C'||rawUnit[1]==='c'?'temperature':'clinometer');
+            }
+          }
+          
+          columns.push({index:i,key:varName.toLowerCase(),label:h.replace(/"/g,''),unit:rawUnit,type,varName});
+        }
+        
+        // Debug: log detected columns
+        console.log('Detected columns:',columns.map(c=>`${c.label} → ${c.type} (unit="${c.unit}", codes=${[...c.unit].map(ch=>ch.charCodeAt(0))})`));
+        
+        // Parse data
+        const data=[];
+        for(let i=1;i<lines.length;i++){
+          const vals=parseRow(lines[i]);
+          if(!vals[0])continue;
+          const dt=parseDate(vals[0]);
+          if(!dt)continue;
+          const row={date:dt,timestamp:dt.getTime(),dateStr:dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'}),dateTimeStr:dt.toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})};
+          for(const col of columns){
+            row[col.key]=parseNum(vals[col.index]);
+          }
+          data.push(row);
+        }
+        data.sort((a,b)=>a.timestamp-b.timestamp);
+        resolve({data,columns,nodeName});
+      }catch(err){reject(err)}
+    };
+    reader.onerror=reject;
+    // Read as ISO-8859-1 (Latin1) to correctly handle ° character (0xB0)
+    reader.readAsText(file,'ISO-8859-1');
+  });
+}
+
+function parseDate(s){
+  if(!s)return null;
+  // dd-MM-yyyy HH:mm:ss or dd/MM/yyyy HH:mm:ss
+  const m=s.match(/(\d{2})[-\/](\d{2})[-\/](\d{4})\s+(\d{2}):(\d{2}):?(\d{2})?/);
+  if(m)return new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+(m[6]||0));
+  // Try ISO
+  const d=new Date(s);
+  return isNaN(d)?null:d;
+}
+function parseNum(s){
+  if(s==null||s==='')return null;
+  return parseFloat(String(s).replace(',','.'));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PROCESS ALL FILES
+// ═══════════════════════════════════════════════════════════════════
+async function processAllFiles(){
+  const errEl=document.getElementById('processError');errEl.classList.add('hidden');
+  document.getElementById('btnProcess').textContent='Elaborazione...';
+  try{
+    allNodes={};
+    for(const file of uploadedFiles){
+      let parsed;
+      if(file.name.endsWith('.csv')){
+        parsed=await parseCSV(file);
+      } else {
+        // xlsx/xls
+        parsed=await parseExcelFile(file);
+      }
+      const node=processNode(parsed);
+      allNodes[node.name]=node;
+    }
+    if(Object.keys(allNodes).length===0)throw new Error('Nessun dato elaborato');
+    activeNode=Object.keys(allNodes)[0];
+    initThresholds();
+    document.getElementById('uploadArea').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+    document.getElementById('btnPDF').style.display='';
+    if(currentAuth?.role==='admin')document.getElementById('btnSettings').style.display='';
+    buildNodeSelector();
+    buildTabs();
+    showTab('overview');
+    updateHeader();
+  }catch(err){errEl.textContent=err.message;errEl.classList.remove('hidden')}
+  document.getElementById('btnProcess').textContent='Elabora dati';
+}
+
+function parseExcelFile(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+        // Convert to same format as CSV parser
+        const headers=json[0]||[];
+        const nodeName=headers[1]?String(headers[1]).split(' ')[0]:'Nodo';
+        const columns=[];
+        for(let i=1;i<headers.length;i++){
+          const h=String(headers[i]||'');
+          const unitMatch=h.match(/\[([^\]]+)\]/);
+          const unit=unitMatch?unitMatch[1]:'';
+          const varMatch=h.match(/(VAR\d+|BATT|RSSI)/);
+          const varName=varMatch?varMatch[1]:'COL'+i;
+          let type='unknown';
+          if(unit==='°')type='clinometer';else if(unit==='°C')type='temperature';
+          else if(unit==='mm')type='crackgauge';else if(unit==='Volt')type='battery';else if(unit==='dBm')type='rssi';
+          columns.push({index:i,key:varName.toLowerCase(),label:h,unit,type,varName});
+        }
+        const data=[];
+        for(let i=1;i<json.length;i++){
+          const r=json[i];if(!r||!r[0])continue;
+          let dt=r[0];if(typeof dt==='number')dt=new Date((dt-25569)*86400000);
+          if(!(dt instanceof Date)||isNaN(dt))continue;
+          const row={date:dt,timestamp:dt.getTime(),dateStr:dt.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'}),dateTimeStr:dt.toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})};
+          for(const col of columns)row[col.key]=parseFloat(r[col.index])||null;
+          data.push(row);
+        }
+        data.sort((a,b)=>a.timestamp-b.timestamp);
+        resolve({data,columns,nodeName});
+      }catch(err){reject(err)}
+    };
+    reader.onerror=reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function processNode(parsed){
+  const{data,columns,nodeName}=parsed;
+  
+  // Classify sensors
+  const clinometers=columns.filter(c=>c.type==='clinometer');
+  const crackgauges=columns.filter(c=>c.type==='crackgauge');
+  const tempSensor=columns.find(c=>c.type==='temperature');
+  const batterySensor=columns.find(c=>c.type==='battery');
+  const rssiSensor=columns.find(c=>c.type==='rssi');
+  
+  // Get temperature data (from sensor or external)
+  let hasTemp=!!tempSensor;
+  let tempKey=tempSensor?.key;
+  
+  if(!hasTemp&&tempData){
+    // Match external temperature by nearest timestamp
+    data.forEach(row=>{
+      const closest=findClosest(tempData.dates,row.date);
+      if(closest!==null)row._extTemp=tempData.values[closest];
+    });
+    hasTemp=data.some(r=>r._extTemp!=null);
+    tempKey='_extTemp';
+  }
+  
+  // Compute regressions if temperature available
+  const regressions={};
+  if(hasTemp){
+    const temps=data.map(r=>r[tempKey]);
+    clinometers.forEach(c=>{
+      regressions[c.key]=linReg(temps,data.map(r=>r[c.key]));
+    });
+    crackgauges.forEach(c=>{
+      regressions[c.key]=linReg(temps,data.map(r=>r[c.key]));
+    });
+  }
+  
+  // Compute depurated values
+  const alarms=[];
+  data.forEach((row,i)=>{
+    const T=hasTemp?row[tempKey]:null;
+    
+    // Clinometer depuration
+    clinometers.forEach(c=>{
+      if(hasTemp&&regressions[c.key]){
+        const reg=regressions[c.key];
+        row[c.key+'_depTref']=row[c.key]-reg.m*(T-TREF);
+        row[c.key+'_dep']=row[c.key]-(reg.y0+reg.m*T);
+      }
+      // Angular displacement
+      const v0=i===0?row[c.key]:(data[0][c.key]||0);
+      row[c.key+'_angDisp']=Math.sin(((row[c.key]||0)-(v0||0))*Math.PI/180)*DISP_FACTOR;
+    });
+    
+    // Crackgauge depuration
+    crackgauges.forEach(c=>{
+      if(hasTemp&&regressions[c.key]){
+        const reg=regressions[c.key];
+        row[c.key+'_dep']=row[c.key]-(reg.y0+reg.m*T);
+      }
+    });
+
+    // Check alarms
+    const checkAlarm=(val,key,label,unit,mode)=>{
+      const th=THRESHOLDS[nodeName+'_'+key];
+      if(!th||val==null)return;
+      const v=mode==='below'?val:Math.abs(val);
+      const isB=mode==='below';
+      if(isB?v<=th.danger:v>=th.danger)alarms.push({type:'danger',key:nodeName+'_'+key,value:val,threshold:th.danger,label,date:row.dateTimeStr,unit});
+      else if(isB?v<=th.warning:v>=th.warning)alarms.push({type:'warning',key:nodeName+'_'+key,value:val,threshold:th.warning,label,date:row.dateTimeStr,unit});
+    };
+    clinometers.forEach(c=>{if(row[c.key+'_dep']!=null)checkAlarm(row[c.key+'_dep'],c.key+'_dep',c.label+' dep.',c.unit,'abs')});
+    crackgauges.forEach(c=>{if(row[c.key+'_dep']!=null)checkAlarm(row[c.key+'_dep'],c.key+'_dep',c.label+' dep.',c.unit,'abs')});
+    if(batterySensor&&row[batterySensor.key]!=null)checkAlarm(row[batterySensor.key],batterySensor.key,batterySensor.label,batterySensor.unit,'below');
+  });
+  
+  // Deduplicate alarms
+  const am=new Map();
+  alarms.forEach(a=>{const k=`${a.key}_${a.date?.split(',')[0]}`;if(!am.has(k)||a.type==='danger')am.set(k,a)});
+  
+  return{
+    name:nodeName,data,columns,clinometers,crackgauges,tempSensor,tempKey,hasTemp,
+    batterySensor,rssiSensor,regressions,
+    alarms:[...am.values()].slice(-100).reverse(),
+  };
+}
+
+function linReg(xs,ys){
+  let n=0,sx=0,sy=0,sxy=0,sxx=0;
+  for(let i=0;i<xs.length;i++){if(xs[i]!=null&&ys[i]!=null&&isFinite(xs[i])&&isFinite(ys[i])){n++;sx+=xs[i];sy+=ys[i];sxy+=xs[i]*ys[i];sxx+=xs[i]*xs[i]}}
+  if(n<2)return{m:0,y0:0};const m=(n*sxy-sx*sy)/(n*sxx-sx*sx);return{m,y0:(sy-m*sx)/n};
+}
+
+function findClosest(dates,target){
+  if(!dates||!dates.length)return null;
+  let best=0,bestD=Math.abs(dates[0]-target);
+  for(let i=1;i<dates.length;i++){const d=Math.abs(dates[i]-target);if(d<bestD){bestD=d;best=i}}
+  return bestD<3600000*6?best:null; // within 6 hours
+}
+
+function downsample(arr,max=2000){
+  if(arr.length<=max)return arr;
+  const s=Math.ceil(arr.length/max);const r=[];
+  for(let i=0;i<arr.length;i+=s)r.push(arr[i]);
+  if(r[r.length-1]!==arr[arr.length-1])r.push(arr[arr.length-1]);
+  return r;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// THRESHOLDS
+// ═══════════════════════════════════════════════════════════════════
+function initThresholds(){
+  THRESHOLDS={};
+  Object.values(allNodes).forEach(node=>{
+    node.clinometers.forEach(c=>{
+      THRESHOLDS[node.name+'_'+c.key+'_dep']={warning:0.05,danger:0.1,unit:'°',label:node.name+' '+c.label+' dep.'};
+    });
+    node.crackgauges.forEach(c=>{
+      THRESHOLDS[node.name+'_'+c.key+'_dep']={warning:0.5,danger:1.0,unit:'mm',label:node.name+' '+c.label+' dep.'};
+    });
+    if(node.batterySensor){
+      THRESHOLDS[node.name+'_'+node.batterySensor.key]={warning:3.3,danger:3.0,unit:'V',label:node.name+' Batteria'};
+    }
+  });
+  renderThresholdSettings();
+}
+
+function renderThresholdSettings(){
+  const el=document.getElementById('thresholdSettings');
+  el.innerHTML=Object.entries(THRESHOLDS).map(([k,v])=>`
+    <div class="setting-item">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--text)">${v.label}</div>
+      <div class="setting-row">
+        <div><label>Attenzione (${v.unit})</label><input type="number" step="0.01" value="${v.warning}" onchange="THRESHOLDS['${k}'].warning=parseFloat(this.value)"></div>
+        <div><label>Pericolo (${v.unit})</label><input type="number" step="0.01" value="${v.danger}" onchange="THRESHOLDS['${k}'].danger=parseFloat(this.value)"></div>
+      </div>
+    </div>`).join('');
+}
+
+function applyThresholds(){
+  // Re-process alarms
+  Object.keys(allNodes).forEach(name=>{
+    const node=allNodes[name];
+    const oldData=node.data;
+    // re-parse from existing data re-check alarms
+    const alarms=[];
+    oldData.forEach(row=>{
+      const check=(val,key,label,unit,mode)=>{
+        const th=THRESHOLDS[name+'_'+key];if(!th||val==null)return;
+        const v=mode==='below'?val:Math.abs(val);const isB=mode==='below';
+        if(isB?v<=th.danger:v>=th.danger)alarms.push({type:'danger',key:name+'_'+key,value:val,threshold:th.danger,label,date:row.dateTimeStr,unit});
+        else if(isB?v<=th.warning:v>=th.warning)alarms.push({type:'warning',key:name+'_'+key,value:val,threshold:th.warning,label,date:row.dateTimeStr,unit});
+      };
+      node.clinometers.forEach(c=>{if(row[c.key+'_dep']!=null)check(row[c.key+'_dep'],c.key+'_dep',c.label+' dep.',c.unit,'abs')});
+      node.crackgauges.forEach(c=>{if(row[c.key+'_dep']!=null)check(row[c.key+'_dep'],c.key+'_dep',c.label+' dep.',c.unit,'abs')});
+      if(node.batterySensor&&row[node.batterySensor.key]!=null)check(row[node.batterySensor.key],node.batterySensor.key,node.batterySensor.label,node.batterySensor.unit,'below');
+    });
+    const am=new Map();alarms.forEach(a=>{const k=`${a.key}_${a.date?.split(',')[0]}`;if(!am.has(k)||a.type==='danger')am.set(k,a)});
+    node.alarms=[...am.values()].slice(-100).reverse();
+  });
+  showTab(activeTab);
+  updateHeader();
+}
+
+function toggleSettings(){document.getElementById('settingsPanel').classList.toggle('hidden')}
+
+// ═══════════════════════════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════════════════════════
+function backToUpload(){
+  allNodes={};activeNode=null;destroyAll();
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('uploadArea').classList.remove('hidden');
+  document.getElementById('btnPDF').style.display='none';
+  document.getElementById('btnSettings').style.display='none';
+  document.getElementById('settingsPanel').classList.add('hidden');
+  uploadedFiles=[];tempData=null;
+  document.getElementById('fileList').innerHTML='';
+  document.getElementById('tempFileInfo').innerHTML='';
+  document.getElementById('btnProcess').disabled=true;
+}
+
+function buildNodeSelector(){
+  const el=document.getElementById('nodeSelector');
+  const names=Object.keys(allNodes);
+  if(names.length<=1){el.innerHTML='';return}
+  el.innerHTML=names.map(n=>`<button class="node-chip ${n===activeNode?'active':''}" onclick="switchNode('${n}')">${n} <span style="font-size:10px;opacity:0.7">(${allNodes[n].data.length})</span></button>`).join('');
+}
+
+function switchNode(name){activeNode=name;buildNodeSelector();showTab(activeTab);updateHeader()}
+
+function updateHeader(){
+  const node=allNodes[activeNode];if(!node)return;
+  const d=node.data;
+  document.getElementById('hdrInfo').textContent=`${node.name} · ${d.length.toLocaleString()} letture · ${d[0]?.dateStr} → ${d[d.length-1]?.dateStr}`;
+  const dc=node.alarms.filter(a=>a.type==='danger').length;
+  const wc=node.alarms.filter(a=>a.type==='warning').length;
+  let b='';
+  if(dc)b+=`<span class="badge badge-danger" style="animation:pulse 1.5s infinite">${dc}</span> `;
+  if(wc)b+=`<span class="badge badge-warn">${wc}</span>`;
+  document.getElementById('hdrBadges').innerHTML=b;
+}
+
+const TABS=[
+  {id:'overview',label:'Panoramica',icon:'◉'},
+  {id:'originali',label:'Dati originali',icon:'◇'},
+  {id:'depurati',label:'Dati depurati',icon:'◆'},
+  {id:'temperatura',label:'Temperatura',icon:'◌'},
+  {id:'diagnostica',label:'Diagnostica',icon:'⚙'},
+  {id:'allarmi',label:'Allarmi',icon:'⚠'},
+  {id:'riepilogo',label:'Riepilogo committente',icon:'📋'},
+];
+
+function buildTabs(){
+  const el=document.getElementById('tabBar');
+  const node=allNodes[activeNode];
+  const ac=node?.alarms.length||0;
+  el.innerHTML=TABS.map(t=>{
+    let badge='';
+    if(t.id==='allarmi'&&ac)badge=`<span class="badge badge-danger" style="margin-left:4px">${ac}</span>`;
+    return`<button class="tab ${t.id===activeTab?'active':''}" onclick="showTab('${t.id}')">${t.icon} ${t.label}${badge}</button>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CHART ENGINE
+// ═══════════════════════════════════════════════════════════════════
+function destroyAll(){Object.values(charts).forEach(c=>c.destroy());charts={}}
+
+function dateFilter(){
+  const from=document.getElementById('dfFrom')?.value;
+  const to=document.getElementById('dfTo')?.value;
+  const node=allNodes[activeNode];if(!node)return node.data;
+  let d=node.data;
+  if(from)d=d.filter(r=>r.date>=new Date(from));
+  if(to){const t=new Date(to);t.setHours(23,59,59);d=d.filter(r=>r.date<=t)}
+  return d;
+}
+
+function makeDateFilterHTML(node){
+  const d=node.data;
+  const minD=d[0]?.date.toISOString().split('T')[0]||'';
+  const maxD=d[d.length-1]?.date.toISOString().split('T')[0]||'';
+  return`<div class="date-filter">
+    <label>Da:</label><input type="date" class="date-input" id="dfFrom" value="${minD}" min="${minD}" max="${maxD}" onchange="showTab('${activeTab}')">
+    <label>A:</label><input type="date" class="date-input" id="dfTo" value="${maxD}" min="${minD}" max="${maxD}" onchange="showTab('${activeTab}')">
+    <div class="quick-btns">
+      <button class="btn btn-sm" onclick="setDateRange(7)">7gg</button>
+      <button class="btn btn-sm" onclick="setDateRange(30)">30gg</button>
+      <button class="btn btn-sm" onclick="setDateRange(90)">90gg</button>
+      <button class="btn btn-sm" onclick="setDateRange(0)">Tutto</button>
+    </div>
+  </div>`;
+}
+
+function setDateRange(days){
+  const node=allNodes[activeNode];if(!node)return;
+  const d=node.data;
+  if(days===0){
+    document.getElementById('dfFrom').value=d[0]?.date.toISOString().split('T')[0];
+    document.getElementById('dfTo').value=d[d.length-1]?.date.toISOString().split('T')[0];
+  }else{
+    const to=d[d.length-1]?.date||new Date();
+    const from=new Date(to);from.setDate(from.getDate()-days);
+    document.getElementById('dfFrom').value=from.toISOString().split('T')[0];
+    document.getElementById('dfTo').value=to.toISOString().split('T')[0];
+  }
+  showTab(activeTab);
+}
+
+function makeChart(id,data,datasets,opts={}){
+  if(charts[id])charts[id].destroy();
+  const ctx=document.getElementById(id);if(!ctx)return;
+  const ds=downsample(data);
+  const cds=datasets.map((d,i)=>({
+    label:d.label,data:ds.map(r=>r[d.key]),
+    borderColor:d.color||SENSOR_COLORS[i%SENSOR_COLORS.length],
+    backgroundColor:(d.color||SENSOR_COLORS[i%SENSOR_COLORS.length])+'20',
+    borderWidth:1.5,pointRadius:0,tension:0.1,fill:false,
+  }));
+  const anns={};
+  if(opts.refLine!=null)anns.ref={type:'line',yMin:opts.refLine,yMax:opts.refLine,borderColor:'rgba(74,85,104,0.5)',borderWidth:1,borderDash:[4,4]};
+  if(opts.thresholds){
+    opts.thresholds.forEach((t,i)=>{
+      if(t.w){anns['w'+i+'p']={type:'line',yMin:t.w,yMax:t.w,borderColor:'rgba(245,158,11,0.35)',borderWidth:1,borderDash:[3,4]};
+        anns['w'+i+'n']={type:'line',yMin:-t.w,yMax:-t.w,borderColor:'rgba(245,158,11,0.35)',borderWidth:1,borderDash:[3,4]}}
+      if(t.d){anns['d'+i+'p']={type:'line',yMin:t.d,yMax:t.d,borderColor:'rgba(239,68,68,0.35)',borderWidth:1,borderDash:[3,4]};
+        anns['d'+i+'n']={type:'line',yMin:-t.d,yMax:-t.d,borderColor:'rgba(239,68,68,0.35)',borderWidth:1,borderDash:[3,4]}}
+    });
+  }
+  charts[id]=new Chart(ctx,{type:'line',data:{labels:ds.map(r=>r.date),datasets:cds},options:{
+    responsive:true,maintainAspectRatio:false,animation:{duration:400},
+    scales:{
+      x:{type:'time',time:{tooltipFormat:'dd/MM/yyyy HH:mm',displayFormats:{hour:'dd/MM HH:mm',day:'dd/MM/yy',month:'MM/yyyy'}},grid:{color:'rgba(26,37,53,0.5)'},ticks:{color:'#4a5568',font:{size:9},maxTicksLimit:10}},
+      y:{grid:{color:'rgba(26,37,53,0.5)'},ticks:{color:'#4a5568',font:{size:9},callback:v=>(typeof v==='number'?v.toFixed(opts.dec||3):v)},title:opts.yT?{display:true,text:opts.yT,color:'#4a5568',font:{size:10}}:undefined}
+    },
+    plugins:{legend:{labels:{color:'#8b97a8',font:{size:10},usePointStyle:true}},tooltip:{backgroundColor:'rgba(15,22,32,0.96)',titleColor:'#e8ecf2',bodyColor:'#8b97a8',callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y?.toFixed(4)}`}},annotation:{annotations:anns}},
+    interaction:{mode:'index',intersect:false},
+  }});
+}
+
+function makeScatter(id,data,xKey,yKey,color,xL,yL){
+  if(charts[id])charts[id].destroy();
+  const ctx=document.getElementById(id);if(!ctx)return;
+  const ds=downsample(data,800);
+  charts[id]=new Chart(ctx,{type:'scatter',data:{datasets:[{data:ds.map(d=>({x:d[xKey],y:d[yKey]})),backgroundColor:color+'60',borderColor:color,pointRadius:1.5}]},options:{
+    responsive:true,maintainAspectRatio:false,
+    scales:{x:{grid:{color:'rgba(26,37,53,0.5)'},ticks:{color:'#4a5568',font:{size:9}},title:{display:true,text:xL,color:'#4a5568',font:{size:10}}},y:{grid:{color:'rgba(26,37,53,0.5)'},ticks:{color:'#4a5568',font:{size:9},callback:v=>v.toFixed(3)},title:{display:true,text:yL,color:'#4a5568',font:{size:10}}}},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(15,22,32,0.96)'}},
+  }});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TAB RENDERING
+// ═══════════════════════════════════════════════════════════════════
+function showTab(id){
+  activeTab=id;destroyAll();buildTabs();
+  const area=document.getElementById('contentArea');
+  const node=allNodes[activeNode];if(!node){area.innerHTML='';return}
+  const fd=dateFilter();
+  const last=fd[fd.length-1],first=fd[0];
+  const alarms=node.alarms;
+  const dc=alarms.filter(a=>a.type==='danger').length;
+
+  if(id==='overview'){
+    // Build stats from last reading
+    let statsHTML='';
+    node.clinometers.forEach((c,i)=>{
+      const v=last?.[c.key];const vd=last?.[c.key+'_dep'];
+      statsHTML+=`<div class="stat"><div class="stat-bar" style="background:linear-gradient(90deg,${SENSOR_COLORS[i]},transparent)"></div><div class="stat-label">${c.label}</div><div class="stat-val">${v!=null?v.toFixed(4):'—'}<span class="stat-unit">${c.unit}</span></div>${vd!=null?`<div class="stat-sub">dep: ${vd.toFixed(4)}°</div>`:''}</div>`;
+    });
+    node.crackgauges.forEach((c,i)=>{
+      const v=last?.[c.key];const vd=last?.[c.key+'_dep'];
+      statsHTML+=`<div class="stat"><div class="stat-bar" style="background:linear-gradient(90deg,${SENSOR_COLORS[(node.clinometers.length+i)%SENSOR_COLORS.length]},transparent)"></div><div class="stat-label">${c.label}</div><div class="stat-val">${v!=null?v.toFixed(4):'—'}<span class="stat-unit">mm</span></div>${vd!=null?`<div class="stat-sub">dep: ${vd.toFixed(4)} mm</div>`:''}</div>`;
+    });
+    if(node.hasTemp){const T=last?.[node.tempKey];statsHTML+=`<div class="stat"><div class="stat-bar" style="background:linear-gradient(90deg,var(--temp),transparent)"></div><div class="stat-label">Temperatura</div><div class="stat-val">${T!=null?T.toFixed(1):'—'}<span class="stat-unit">°C</span></div></div>`}
+    if(node.batterySensor){const b=last?.[node.batterySensor.key];statsHTML+=`<div class="stat"><div class="stat-bar" style="background:linear-gradient(90deg,var(--green),transparent)"></div><div class="stat-label">Batteria</div><div class="stat-val">${b!=null?b.toFixed(2):'—'}<span class="stat-unit">V</span></div></div>`}
+
+    area.innerHTML=`
+      ${dc>0?`<div class="alert alert-danger"><span style="font-size:16px">⚠</span><strong>${dc} allarmi</strong> — vedi tab Allarmi</div>`:''}
+      ${makeDateFilterHTML(node)}
+      <div class="stats-grid">${statsHTML}</div>
+      <div class="charts">
+        ${node.clinometers.length&&node.hasTemp?`<div class="chart-card chart-full"><h3>Clinometri — Depurati (Tref=${TREF}°C)</h3><div class="sub">Linee tratteggiate = soglie allarme</div><div style="height:280px"><canvas id="ch_ov_clin"></canvas></div></div>`:''}
+        ${node.clinometers.length&&!node.hasTemp?`<div class="chart-card chart-full"><h3>Clinometri — Dati originali</h3><div class="sub">Temperatura non disponibile — nessuna compensazione termica</div><div style="height:280px"><canvas id="ch_ov_clin_raw"></canvas></div></div>`:''}
+        <div class="charts charts-2">
+          ${node.crackgauges.length?`<div class="chart-card"><h3>Fessurimetri${node.hasTemp?' — Depurati':''}</h3><div class="sub">${node.hasTemp?'Netto effetto termico':'Dati originali'}</div><div style="height:240px"><canvas id="ch_ov_fess"></canvas></div></div>`:''}
+          ${node.hasTemp?`<div class="chart-card"><h3>Temperatura</h3><div class="sub">Andamento sensore</div><div style="height:240px"><canvas id="ch_ov_temp"></canvas></div></div>`:''}
+        </div>
+      </div>`;
+    setTimeout(()=>{
+      if(node.clinometers.length&&node.hasTemp){
+        const ths=node.clinometers.map(c=>{const t=THRESHOLDS[node.name+'_'+c.key+'_dep'];return t?{w:t.warning,d:t.danger}:{}});
+        makeChart('ch_ov_clin',fd,node.clinometers.map((c,i)=>({key:c.key+'_depTref',label:c.label+' dep.Tref',color:SENSOR_COLORS[i]})),{refLine:0,thresholds:ths});
+      }
+      if(node.clinometers.length&&!node.hasTemp){
+        makeChart('ch_ov_clin_raw',fd,node.clinometers.map((c,i)=>({key:c.key,label:c.label,color:SENSOR_COLORS[i]})));
+      }
+      if(node.crackgauges.length){
+        const key=node.hasTemp?'_dep':'';
+        const ci=node.clinometers.length;
+        makeChart('ch_ov_fess',fd,node.crackgauges.map((c,i)=>({key:c.key+key,label:c.label+(key?' dep.':''),color:SENSOR_COLORS[(ci+i)%SENSOR_COLORS.length]})),{refLine:node.hasTemp?0:undefined,yT:'mm'});
+      }
+      if(node.hasTemp)makeChart('ch_ov_temp',fd,[{key:node.tempKey,label:'Temp [°C]',color:'#ef4444'}],{refLine:TREF,dec:1,yT:'°C'});
+    },50);
+  }
+
+  else if(id==='originali'){
+    area.innerHTML=`${makeDateFilterHTML(node)}
+      <div class="charts">
+        ${node.clinometers.length?`<div class="chart-card"><h3>Clinometri — Originali</h3><div class="sub">Dati grezzi</div><div style="height:300px"><canvas id="ch_or_c"></canvas></div></div>`:''}
+        ${node.crackgauges.length?`<div class="chart-card"><h3>Fessurimetri — Originali</h3><div class="sub">Dati grezzi [mm]</div><div style="height:300px"><canvas id="ch_or_f"></canvas></div></div>`:''}
+      </div>`;
+    setTimeout(()=>{
+      if(node.clinometers.length)makeChart('ch_or_c',fd,node.clinometers.map((c,i)=>({key:c.key,label:c.label,color:SENSOR_COLORS[i]})));
+      if(node.crackgauges.length){const ci=node.clinometers.length;makeChart('ch_or_f',fd,node.crackgauges.map((c,i)=>({key:c.key,label:c.label,color:SENSOR_COLORS[(ci+i)%SENSOR_COLORS.length]})),{yT:'mm'})}
+    },50);
+  }
+
+  else if(id==='depurati'){
+    if(!node.hasTemp){
+      area.innerHTML=`<div class="alert alert-danger">⚠ Temperatura non disponibile per questo nodo — la compensazione termica non può essere calcolata. Carica un CSV temperatura nella sezione upload.</div>`;
+      return;
+    }
+    area.innerHTML=`${makeDateFilterHTML(node)}
+      <div class="charts">
+        ${node.clinometers.length?`
+          <div class="chart-card"><h3>Clinometri — Depurati (Tref=${TREF}°C)</h3><div class="sub">misurato − m×(T−Tref)</div><div style="height:280px"><canvas id="ch_dp_ctref"></canvas></div></div>
+          <div class="chart-card"><h3>Clinometri — Residui</h3><div class="sub">misurato − valore previsto</div><div style="height:280px"><canvas id="ch_dp_cres"></canvas></div></div>
+          <div class="chart-card"><h3>Spostamenti angolari</h3><div class="sub">sin(Δθ) × ${DISP_FACTOR} mm</div><div style="height:280px"><canvas id="ch_dp_cang"></canvas></div></div>
+        `:''}
+        ${node.crackgauges.length?`<div class="chart-card"><h3>Fessurimetri — Depurati</h3><div class="sub">Netto effetto termico</div><div style="height:280px"><canvas id="ch_dp_f"></canvas></div></div>`:''}
+        <div class="chart-card"><h3>Parametri di regressione</h3><div class="reg-info">
+          ${[...node.clinometers,...node.crackgauges].map((c,i)=>{const r=node.regressions[c.key];return r?`<div><span style="color:${SENSOR_COLORS[i%SENSOR_COLORS.length]}">■</span> ${c.label}: y = ${r.y0.toFixed(6)} + (${r.m.toExponential(4)}) × T</div>`:''}).join('')}
+          <div style="color:var(--temp)">Tref = ${TREF}°C</div>
+        </div></div>
+      </div>`;
+    setTimeout(()=>{
+      if(node.clinometers.length){
+        makeChart('ch_dp_ctref',fd,node.clinometers.map((c,i)=>({key:c.key+'_depTref',label:c.label+' dep.Tref',color:SENSOR_COLORS[i]})),{refLine:0});
+        makeChart('ch_dp_cres',fd,node.clinometers.map((c,i)=>({key:c.key+'_dep',label:c.label+' residuo',color:SENSOR_COLORS[i]})),{refLine:0});
+        makeChart('ch_dp_cang',fd,node.clinometers.map((c,i)=>({key:c.key+'_angDisp',label:c.label+' spost.ang.',color:SENSOR_COLORS[i]})),{refLine:0,yT:'mm',dec:2});
+      }
+      if(node.crackgauges.length){const ci=node.clinometers.length;makeChart('ch_dp_f',fd,node.crackgauges.map((c,i)=>({key:c.key+'_dep',label:c.label+' dep.',color:SENSOR_COLORS[(ci+i)%SENSOR_COLORS.length]})),{refLine:0,yT:'mm'})}
+    },50);
+  }
+
+  else if(id==='temperatura'){
+    if(!node.hasTemp){area.innerHTML=`<div class="alert alert-danger">⚠ Temperatura non disponibile per questo nodo.</div>`;return}
+    area.innerHTML=`${makeDateFilterHTML(node)}
+      <div class="charts">
+        <div class="chart-card"><h3>Andamento temperatura</h3><div class="sub">Serie completa</div><div style="height:280px"><canvas id="ch_t"></canvas></div></div>
+        <div class="charts charts-2">
+          ${node.clinometers.map((c,i)=>`<div class="chart-card"><h3>Correlazione T → ${c.label}</h3><div class="sub">Scatter</div><div style="height:260px"><canvas id="ch_ts${i}"></canvas></div></div>`).join('')}
+        </div>
+      </div>`;
+    setTimeout(()=>{
+      makeChart('ch_t',fd,[{key:node.tempKey,label:'Temp [°C]',color:'#ef4444'}],{refLine:TREF,dec:1,yT:'°C'});
+      node.clinometers.forEach((c,i)=>makeScatter('ch_ts'+i,fd,node.tempKey,c.key,SENSOR_COLORS[i],'Temperatura [°C]',c.label));
+    },50);
+  }
+
+  else if(id==='diagnostica'){
+    area.innerHTML=`${makeDateFilterHTML(node)}<div class="charts charts-2">
+      ${node.batterySensor?`<div class="chart-card"><h3>Batteria</h3><div class="sub">[V]</div><div style="height:260px"><canvas id="ch_bat"></canvas></div></div>`:'<div class="chart-card"><h3>Batteria</h3><div class="sub">Non disponibile</div></div>'}
+      ${node.rssiSensor?`<div class="chart-card"><h3>RSSI</h3><div class="sub">[dBm]</div><div style="height:260px"><canvas id="ch_rssi"></canvas></div></div>`:'<div class="chart-card"><h3>RSSI</h3><div class="sub">Non disponibile</div></div>'}
+    </div>`;
+    setTimeout(()=>{
+      if(node.batterySensor)makeChart('ch_bat',fd,[{key:node.batterySensor.key,label:'Batteria [V]',color:'#10b981'}],{dec:1,yT:'V'});
+      if(node.rssiSensor)makeChart('ch_rssi',fd,[{key:node.rssiSensor.key,label:'RSSI [dBm]',color:'#3b82f6'}],{dec:0,yT:'dBm'});
+    },50);
+  }
+
+  else if(id==='allarmi'){
+    if(!alarms.length){area.innerHTML=`<div class="chart-card"><div style="text-align:center;padding:32px"><div style="font-size:36px;opacity:0.4;margin-bottom:8px">✓</div><h3 style="color:var(--green);font-size:15px">Nessun allarme</h3><p style="color:var(--text2);font-size:12px">Tutti i valori entro le soglie.</p></div></div>`;return}
+    const dc2=alarms.filter(a=>a.type==='danger').length,wc=alarms.filter(a=>a.type==='warning').length;
+    area.innerHTML=`
+      <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+        <div class="stat"><div class="stat-bar" style="background:var(--danger)"></div><div class="stat-label">Pericolo</div><div class="stat-val" style="color:var(--danger)">${dc2}</div></div>
+        <div class="stat"><div class="stat-bar" style="background:var(--warn)"></div><div class="stat-label">Attenzione</div><div class="stat-val" style="color:var(--warn)">${wc}</div></div>
+        <div class="stat"><div class="stat-bar" style="background:var(--accent)"></div><div class="stat-label">Totale</div><div class="stat-val">${dc2+wc}</div></div>
+      </div>
+      <div class="chart-card"><h3>Registro allarmi</h3><div style="max-height:420px;overflow-y:auto;margin-top:10px">
+        <table class="alarm-table"><thead><tr><th>Livello</th><th>Data</th><th>Grandezza</th><th>Valore</th><th>Soglia</th></tr></thead><tbody>
+        ${alarms.map(a=>`<tr class="${a.type==='danger'?'row-dng':''}"><td><span class="badge badge-${a.type==='danger'?'danger':'warn'}">${a.type==='danger'?'PERICOLO':'ATTENZIONE'}</span></td><td class="mono">${a.date}</td><td>${a.label}</td><td class="mono" style="color:var(--${a.type==='danger'?'danger':'warn'})">${a.value?.toFixed(4)} ${a.unit||''}</td><td class="mono">±${a.threshold}</td></tr>`).join('')}
+        </tbody></table></div></div>`;
+  }
+
+  else if(id==='riepilogo'){
+    const summary=buildSummary(node,fd);
+    area.innerHTML=`<div class="summary-box">${summary}</div>
+      <div style="margin-top:12px;text-align:right"><button class="btn btn-green" onclick="doPDF()">📄 Esporta come PDF</button></div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CLIENT SUMMARY
+// ═══════════════════════════════════════════════════════════════════
+function buildSummary(node,data){
+  const last=data[data.length-1],first=data[0];
+  const period=`${first?.dateStr} — ${last?.dateStr}`;
+  const n=data.length;
+  let html=`<h3 style="color:var(--text);font-size:16px;margin-bottom:12px">Riepilogo Monitoraggio — ${node.name}</h3>`;
+  html+=`<p>Periodo di osservazione: <strong>${period}</strong> (${n.toLocaleString()} letture).</p>`;
+  
+  // Clinometers summary
+  if(node.clinometers.length){
+    html+=`<p style="margin-top:12px"><strong>Clinometri (inclinazione):</strong></p>`;
+    node.clinometers.forEach(c=>{
+      const vals=data.map(r=>r[c.key]).filter(v=>v!=null);
+      const min=Math.min(...vals),max=Math.max(...vals),lastV=last?.[c.key];
+      const depVals=data.map(r=>r[c.key+'_dep']).filter(v=>v!=null);
+      const maxDep=depVals.length?Math.max(...depVals.map(Math.abs)):null;
+      const th=THRESHOLDS[node.name+'_'+c.key+'_dep'];
+      let status='<span class="ok">nella norma</span>';
+      if(th&&maxDep!=null){if(maxDep>=th.danger)status='<span class="dng">SUPERATA SOGLIA DI PERICOLO</span>';else if(maxDep>=th.warning)status='<span class="wrn">superata soglia di attenzione</span>'}
+      html+=`<p>• <strong>${c.label}</strong>: ultimo valore ${lastV?.toFixed(4)}°, range ${min.toFixed(4)}°…${max.toFixed(4)}°. ${node.hasTemp&&maxDep!=null?`Max deviazione depurata: ${maxDep.toFixed(4)}°. Stato: ${status}.`:'Compensazione termica non disponibile.'}</p>`;
+    });
+  }
+  
+  // Crackgauges summary
+  if(node.crackgauges.length){
+    html+=`<p style="margin-top:12px"><strong>Fessurimetri (spostamento):</strong></p>`;
+    node.crackgauges.forEach(c=>{
+      const vals=data.map(r=>r[c.key]).filter(v=>v!=null);
+      const min=Math.min(...vals),max=Math.max(...vals),lastV=last?.[c.key];
+      const depVals=data.map(r=>r[c.key+'_dep']).filter(v=>v!=null);
+      const maxDep=depVals.length?Math.max(...depVals.map(Math.abs)):null;
+      const th=THRESHOLDS[node.name+'_'+c.key+'_dep'];
+      let status='<span class="ok">nella norma</span>';
+      if(th&&maxDep!=null){if(maxDep>=th.danger)status='<span class="dng">SUPERATA SOGLIA DI PERICOLO</span>';else if(maxDep>=th.warning)status='<span class="wrn">superata soglia di attenzione</span>'}
+      html+=`<p>• <strong>${c.label}</strong>: ultimo ${lastV?.toFixed(4)} mm, range ${min.toFixed(4)}…${max.toFixed(4)} mm. ${node.hasTemp&&maxDep!=null?`Max dev. depurata: ${maxDep.toFixed(4)} mm. Stato: ${status}.`:'Compensazione termica non disponibile.'}</p>`;
+    });
+  }
+  
+  // Temperature
+  if(node.hasTemp){
+    const temps=data.map(r=>r[node.tempKey]).filter(v=>v!=null);
+    html+=`<p style="margin-top:12px"><strong>Temperatura:</strong> range ${Math.min(...temps).toFixed(1)}°C…${Math.max(...temps).toFixed(1)}°C, ultimo valore ${last?.[node.tempKey]?.toFixed(1)}°C. Temperatura di riferimento per la compensazione: ${TREF}°C.</p>`;
+  }
+  
+  // Alarms
+  const dc=node.alarms.filter(a=>a.type==='danger').length;
+  const wc=node.alarms.filter(a=>a.type==='warning').length;
+  if(dc>0)html+=`<p style="margin-top:12px" class="dng"><strong>⚠ ATTENZIONE: ${dc} superamenti della soglia di pericolo rilevati.</strong> Si consiglia un sopralluogo.</p>`;
+  else if(wc>0)html+=`<p style="margin-top:12px" class="wrn"><strong>Nota: ${wc} superamenti della soglia di attenzione rilevati.</strong> Situazione da monitorare.</p>`;
+  else html+=`<p style="margin-top:12px" class="ok"><strong>✓ Nessun allarme rilevato.</strong> Tutti i parametri entro le soglie configurate.</p>`;
+  
+  html+=`<p style="margin-top:16px;font-size:11px;color:var(--dim)">Report generato il ${new Date().toLocaleDateString('it-IT')} alle ${new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}.</p>`;
+  return html;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PDF EXPORT
+// ═══════════════════════════════════════════════════════════════════
+function doPDF(){
+  const node=allNodes[activeNode];if(!node)return;
+  const fd=dateFilter();
+  const summary=buildSummary(node,fd).replace(/var\(--text\)/g,'#1a1a2e').replace(/var\(--dim\)/g,'#999');
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Report ${node.name}</title>
+<style>@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Outfit',sans-serif;padding:40px;color:#1a1a2e;max-width:900px;margin:0 auto;line-height:1.8}
+h3{font-size:20px;margin-bottom:8px;border-bottom:2px solid #2563eb;padding-bottom:6px}
+strong{color:#1a1a2e}p{margin-bottom:4px;font-size:13px}
+.ok{color:#10b981}.wrn{color:#f59e0b}.dng{color:#ef4444}
+.mono{font-family:'IBM Plex Mono',monospace}
+table{width:100%;border-collapse:collapse;font-size:11px;margin:12px 0}
+th,td{padding:6px 8px;text-align:left;border-bottom:1px solid #e2e8f0}th{background:#f8fafc;font-weight:600}
+.ft{margin-top:24px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#999}
+@media print{body{padding:20px}}</style></head><body>
+${summary.replace(/color:var\(--[^)]+\)/g,'')}
+<h3 style="margin-top:24px;font-size:14px">Soglie configurate</h3>
+<table><tr><th>Grandezza</th><th>Attenzione</th><th>Pericolo</th></tr>
+${Object.entries(THRESHOLDS).filter(([k])=>k.startsWith(node.name)).map(([k,v])=>`<tr><td>${v.label}</td><td style="color:#f59e0b">${v.warning} ${v.unit}</td><td style="color:#ef4444">${v.danger} ${v.unit}</td></tr>`).join('')}
+</table>
+${node.hasTemp?`<h3 style="margin-top:20px;font-size:14px">Regressioni termiche</h3>
+<table><tr><th>Sensore</th><th>m</th><th>y₀</th></tr>
+${[...node.clinometers,...node.crackgauges].map(c=>{const r=node.regressions[c.key];return r?`<tr><td>${c.label}</td><td class="mono">${r.m.toExponential(5)}</td><td class="mono">${r.y0.toFixed(6)}</td></tr>`:''}).join('')}
+</table>`:''}
+<div class="ft">Report automatico — Dashboard Monitoraggio Strutturale</div>
+</body></html>`;
+  const w=window.open('','_blank');w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
+}
+</script>
+</body>
+</html>
